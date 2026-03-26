@@ -1036,7 +1036,12 @@ const sessionToSala = {
   'Mix & Mastering':  'Sala04',
 };
 
+let mSubmitting = false;
+
 async function confirmBooking() {
+  if (mSubmitting) return;
+  mSubmitting = true;
+
   const btn = document.getElementById('mBtn3');
   btn.disabled = true;
   btn.textContent = 'Salvando...';
@@ -1077,7 +1082,7 @@ async function confirmBooking() {
     showSuccess();
   } catch (err) {
     console.error('Supabase error:', err);
-    // Mostra erro real na tela
+    mSubmitting = false;
     btn.disabled = false;
     btn.textContent = '🎵 Confirmar sessão';
     btn.style.opacity = '1';
