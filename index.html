@@ -772,14 +772,17 @@ footer {
         <div>
           <label style="font-size:11px;color:rgba(242,240,250,0.4);display:block;margin-bottom:6px;letter-spacing:0.04em;">Nome artístico</label>
           <input id="mName" type="text" placeholder="Ex: MC Vitinho" oninput="checkMForm()" style="width:100%;background:rgba(255,255,255,0.04);border:1.5px solid rgba(255,255,255,0.08);border-radius:10px;color:#F2F0FA;font-family:'Instrument Sans',sans-serif;font-size:14px;padding:12px 14px;outline:none;transition:border-color 0.2s;" onfocus="this.style.borderColor='#00E5FF'" onblur="this.style.borderColor='rgba(255,255,255,0.08)'">
+          <div id="mNameErr" style="display:none;font-size:11px;color:#FF3D8B;margin-top:5px;padding-left:2px;"></div>
         </div>
         <div>
           <label style="font-size:11px;color:rgba(242,240,250,0.4);display:block;margin-bottom:6px;letter-spacing:0.04em;">WhatsApp</label>
           <input id="mPhone" type="tel" placeholder="(11) 99999-9999" oninput="checkMForm()" style="width:100%;background:rgba(255,255,255,0.04);border:1.5px solid rgba(255,255,255,0.08);border-radius:10px;color:#F2F0FA;font-family:'Instrument Sans',sans-serif;font-size:14px;padding:12px 14px;outline:none;transition:border-color 0.2s;" onfocus="this.style.borderColor='#00E5FF'" onblur="this.style.borderColor='rgba(255,255,255,0.08)'">
+          <div id="mPhoneErr" style="display:none;font-size:11px;color:#FF3D8B;margin-top:5px;padding-left:2px;"></div>
         </div>
         <div>
           <label style="font-size:11px;color:rgba(242,240,250,0.4);display:block;margin-bottom:6px;letter-spacing:0.04em;">E-mail</label>
           <input id="mEmail" type="email" placeholder="seu@email.com" oninput="checkMForm()" style="width:100%;background:rgba(255,255,255,0.04);border:1.5px solid rgba(255,255,255,0.08);border-radius:10px;color:#F2F0FA;font-family:'Instrument Sans',sans-serif;font-size:14px;padding:12px 14px;outline:none;transition:border-color 0.2s;" onfocus="this.style.borderColor='#00E5FF'" onblur="this.style.borderColor='rgba(255,255,255,0.08)'">
+          <div id="mEmailErr" style="display:none;font-size:11px;color:#FF3D8B;margin-top:5px;padding-left:2px;"></div>
         </div>
       </div>
 
@@ -841,6 +844,7 @@ function openBooking() {
   renderMDates();
 }
 function closeBooking() {
+  mSubmitting = false;
   document.getElementById('bookingModal').style.display = 'none';
   document.body.style.overflow = '';
   Object.assign(mState, {sessionName:null,sessionPrice:0,date:null,dateISO:null,time:null,duration:null});
@@ -1001,12 +1005,57 @@ function checkMBtn2() {
   btn.disabled = !ok; btn.style.opacity = ok ? '1' : '0.3';
 }
 
+function validateEmail(email) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+function validatePhone(phone) {
+  return phone.replace(/\D/g,'').length >= 10;
+}
+
+function showFieldError(fieldId, msgId, msg) {
+  const el = document.getElementById(msgId);
+  const input = document.getElementById(fieldId);
+  if (el) { el.textContent = msg; el.style.display = msg ? 'block' : 'none'; }
+  if (input) input.style.borderColor = msg ? '#FF3D8B' : 'rgba(255,255,255,0.08)';
+}
+
 function checkMForm() {
-  const ok = document.getElementById('mName').value.trim()
-    && document.getElementById('mPhone').value.trim()
-    && document.getElementById('mEmail').value.trim();
+  const name  = document.getElementById('mName').value.trim();
+  const phone = document.getElementById('mPhone').value.trim();
+  const email = document.getElementById('mEmail').value.trim();
+
+  let valid = true;
+
+  if (!name) {
+    showFieldError('mName', 'mNameErr', 'Por favor, informe seu nome.');
+    valid = false;
+  } else {
+    showFieldError('mName', 'mNameErr', '');
+  }
+
+  if (!phone) {
+    showFieldError('mPhone', 'mPhoneErr', 'Por favor, informe seu WhatsApp.');
+    valid = false;
+  } else if (!validatePhone(phone)) {
+    showFieldError('mPhone', 'mPhoneErr', 'Número inválido — mínimo 10 dígitos.');
+    valid = false;
+  } else {
+    showFieldError('mPhone', 'mPhoneErr', '');
+  }
+
+  if (!email) {
+    showFieldError('mEmail', 'mEmailErr', 'Por favor, informe seu e-mail.');
+    valid = false;
+  } else if (!validateEmail(email)) {
+    showFieldError('mEmail', 'mEmailErr', 'E-mail inválido — ex: nome@email.com');
+    valid = false;
+  } else {
+    showFieldError('mEmail', 'mEmailErr', '');
+  }
+
   const btn = document.getElementById('mBtn3');
-  btn.disabled = !ok; btn.style.opacity = ok ? '1' : '0.3';
+  btn.disabled = !valid; btn.style.opacity = valid ? '1' : '0.3';
 }
 
 function addHoursM(time, h) {
@@ -1039,6 +1088,22 @@ const sessionToSala = {
 let mSubmitting = false;
 
 async function confirmBooking() {
+  // Validação forçada antes de qualquer coisa
+  const name  = document.getElementById('mName').value.trim();
+  const phone = document.getElementById('mPhone').value.trim();
+  const email = document.getElementById('mEmail').value.trim();
+
+  let valid = true;
+  if (!name)  { showFieldError('mName',  'mNameErr',  'Por favor, informe seu nome.'); valid = false; }
+  else          showFieldError('mName',  'mNameErr',  '');
+  if (!phone) { showFieldError('mPhone', 'mPhoneErr', 'Por favor, informe seu WhatsApp.'); valid = false; }
+  else if (!validatePhone(phone)) { showFieldError('mPhone', 'mPhoneErr', 'Número inválido — mínimo 10 dígitos.'); valid = false; }
+  else          showFieldError('mPhone', 'mPhoneErr', '');
+  if (!email) { showFieldError('mEmail', 'mEmailErr', 'Por favor, informe seu e-mail.'); valid = false; }
+  else if (!validateEmail(email)) { showFieldError('mEmail', 'mEmailErr', 'E-mail inválido — ex: nome@email.com'); valid = false; }
+  else          showFieldError('mEmail', 'mEmailErr', '');
+
+  if (!valid) return;
   if (mSubmitting) return;
   mSubmitting = true;
 
@@ -1095,6 +1160,7 @@ async function confirmBooking() {
 }
 
 function showSuccess() {
+  mSubmitting = false;
   [1,2,3].forEach(s => document.getElementById('mStep'+s).style.display='none');
   document.getElementById('mSteps').style.display='none';
   document.getElementById('mSuccess').style.display='block';
