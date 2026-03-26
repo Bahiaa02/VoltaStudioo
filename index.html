@@ -829,10 +829,10 @@ footer {
 
 <script>
 // Booking modal state
-const mState = { sessionName:null, sessionPrice:0, date:null, time:null, duration:null };
-const busyT = ['11:00','14:00','18:00'];
+const mState = { sessionName:null, sessionPrice:0, date:null, dateISO:null, time:null, duration:null };
 const mMonths = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 const mDays = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+const ALL_TIMES = ['09:00','10:00','11:00','12:00','13:00','14:00','15:00','16:00','17:00','18:00','19:00','20:00'];
 
 function openBooking() {
   document.getElementById('bookingModal').style.display = 'block';
@@ -843,8 +843,7 @@ function openBooking() {
 function closeBooking() {
   document.getElementById('bookingModal').style.display = 'none';
   document.body.style.overflow = '';
-  // reset
-  Object.assign(mState, {sessionName:null,sessionPrice:0,date:null,time:null,duration:null});
+  Object.assign(mState, {sessionName:null,sessionPrice:0,date:null,dateISO:null,time:null,duration:null});
   document.querySelectorAll('.msession').forEach(e => e.classList.remove('selected'));
   document.getElementById('mBtn1').disabled = true;
   document.getElementById('mBtn1').style.opacity = '0.3';
@@ -882,6 +881,8 @@ function selectMSession(el) {
   mState.sessionPrice = parseInt(el.dataset.price);
   const btn = document.getElementById('mBtn1');
   btn.disabled = false; btn.style.opacity = '1';
+  // Re-render times se já tiver data selecionada
+  if (mState.date) renderMTimesFromSupabase();
 }
 
 function renderMDates() {
@@ -889,10 +890,12 @@ function renderMDates() {
   const container = document.getElementById('mDates');
   if (!container) return;
   container.innerHTML = '';
-  for(let i=1;i<=10;i++){
+  for(let i=1;i<=14;i++){
     const d = new Date(today); d.setDate(today.getDate()+i);
-    if(d.getDay()===0) continue;
+    if(d.getDay()===0) continue; // fecha domingo
     const label = `${mDays[d.getDay()]} ${d.getDate()}/${mMonths[d.getMonth()]}`;
+    // ISO date para query no Supabase
+    const iso = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
     const div = document.createElement('div');
     div.className = 'mdate';
     div.textContent = label;
@@ -900,42 +903,90 @@ function renderMDates() {
       document.querySelectorAll('.mdate').forEach(e=>e.classList.remove('selected'));
       div.classList.add('selected');
       mState.date = label;
-      renderMTimes();
-      checkMBtn2();
+      mState.dateISO = iso;
+      mState.time = null;
+      mState.duration = null;
+      document.getElementById('mBtn2').disabled = true;
+      document.getElementById('mBtn2').style.opacity = '0.3';
+      renderMTimesFromSupabase();
     };
     container.appendChild(div);
   }
 }
 
-function renderMTimes() {
-  const times = ['09:00','10:00','11:00','12:00','13:00','14:00','15:00','16:00','17:00','18:00','19:00','20:00'];
+async function renderMTimesFromSupabase() {
+  const container = document.getElementById('mTimes');
+  container.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:rgba(242,240,250,0.4);font-size:13px;padding:12px 0;">Verificando disponibilidade...</div>';
+
+  const sala = sessionToSala[mState.sessionName] || 'Sala01';
+
+  try {
+    // Busca reservas do dia e sala no Supabase
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/reservas?select=horario,horario_fim,duracao_h&sala=eq.${sala}&data=eq.${mState.dateISO}`,
+      {
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`,
+        }
+      }
+    );
+
+    const reservas = res.ok ? await res.json() : [];
+
+    // Gera set de horários bloqueados (bloco completo)
+    const busySet = new Set();
+    reservas.forEach(r => {
+      const startIdx = ALL_TIMES.indexOf(r.horario);
+      if (startIdx >= 0) {
+        for(let i = 0; i < r.duracao_h; i++) {
+          if (ALL_TIMES[startIdx + i]) busySet.add(ALL_TIMES[startIdx + i]);
+        }
+      }
+    });
+
+    renderMTimes(busySet);
+  } catch(e) {
+    // Se falhar, mostra todos livres
+    renderMTimes(new Set());
+  }
+}
+
+function renderMTimes(busySet = new Set()) {
   const container = document.getElementById('mTimes');
   container.innerHTML = '';
-  times.forEach(t => {
-    const busy = busyT.includes(t);
+  ALL_TIMES.forEach(t => {
+    const busy = busySet.has(t);
     const div = document.createElement('div');
-    div.className = 'mslot' + (busy?' busy':'');
-    div.innerHTML = t + '<div style="font-size:10px;color:rgba(242,240,250,0.35);margin-top:2px">'+(busy?'Ocupado':'Livre')+'</div>';
-    if(!busy) div.onclick = () => {
-      document.querySelectorAll('.mslot:not(.busy)').forEach(e=>e.classList.remove('selected'));
+    div.className = 'mslot' + (busy ? ' busy' : '');
+    div.innerHTML = t + '<div style="font-size:10px;color:rgba(242,240,250,0.35);margin-top:2px">' + (busy ? 'Ocupado' : 'Livre') + '</div>';
+    if (!busy) div.onclick = () => {
+      document.querySelectorAll('.mslot:not(.busy)').forEach(e => e.classList.remove('selected'));
       div.classList.add('selected');
       mState.time = t;
-      renderMDurs();
+      mState.duration = null;
+      renderMDurs(busySet);
       checkMBtn2();
     };
     container.appendChild(div);
   });
 }
 
-function renderMDurs() {
+function renderMDurs(busySet = new Set()) {
   const container = document.getElementById('mDurs');
   container.innerHTML = '';
   [1,2,3,4].forEach(h => {
+    // Verifica se a duração escolhida conflita com horário ocupado
+    const startIdx = ALL_TIMES.indexOf(mState.time);
+    let conflict = false;
+    for(let i = 1; i < h; i++) {
+      if (busySet.has(ALL_TIMES[startIdx + i])) { conflict = true; break; }
+    }
     const div = document.createElement('div');
-    div.className = 'mdur';
-    div.innerHTML = h+'h<div style="font-size:10px;color:rgba(242,240,250,0.35);margin-top:2px">R$000,00</div>';
-    div.onclick = () => {
-      document.querySelectorAll('.mdur').forEach(e=>e.classList.remove('selected'));
+    div.className = 'mdur' + (conflict ? ' busy' : '');
+    div.innerHTML = h + 'h<div style="font-size:10px;color:rgba(242,240,250,0.35);margin-top:2px">' + (conflict ? 'Indisponível' : 'R$000,00') + '</div>';
+    if (!conflict) div.onclick = () => {
+      document.querySelectorAll('.mdur:not(.busy)').forEach(e => e.classList.remove('selected'));
       div.classList.add('selected');
       mState.duration = h;
       checkMBtn2();
@@ -997,7 +1048,7 @@ async function confirmBooking() {
     path:        `VoltaStudio/Reserva/Salas/${sala}`,
     sala:        sala,
     sessao:      mState.sessionName,
-    data:        mState.date,
+    data:        mState.dateISO,
     horario:     mState.time,
     horario_fim: addHoursM(mState.time, mState.duration),
     duracao_h:   mState.duration,
