@@ -759,9 +759,11 @@ footer {
       <p style="font-size:11px;letter-spacing:0.1em;text-transform:uppercase;color:rgba(242,240,250,0.4);margin-bottom:14px;">Duração</p>
       <div style="display:flex;gap:8px;margin-bottom:24px;" id="mDurs"></div>
 
+      <div id="mStep2Err" style="display:none;font-size:11px;color:#FF3D8B;margin-bottom:10px;padding:8px 12px;background:rgba(255,61,139,0.08);border:1px solid rgba(255,61,139,0.2);border-radius:8px;">Selecione data, horário e duração para continuar.</div>
+
       <div style="display:flex;gap:10px;">
         <button onclick="mGoTo(1)" style="flex:0 0 auto;padding:14px 20px;border-radius:100px;border:1px solid rgba(255,255,255,0.08);background:transparent;color:rgba(242,240,250,0.5);font-family:'Syne',sans-serif;font-size:13px;cursor:pointer;">← Voltar</button>
-        <button id="mBtn2" disabled onclick="mGoTo(3)" style="flex:1;padding:16px;border-radius:100px;border:none;background:#FFE135;color:#080810;font-family:'Syne',sans-serif;font-size:14px;font-weight:700;cursor:pointer;opacity:0.3;transition:all 0.2s;">Preencher dados →</button>
+        <button id="mBtn2" disabled onclick="tryGoToStep3()" style="flex:1;padding:16px;border-radius:100px;border:none;background:#FFE135;color:#080810;font-family:'Syne',sans-serif;font-size:14px;font-weight:700;cursor:not-allowed;opacity:0.3;transition:all 0.2s;">Preencher dados →</button>
       </div>
     </div>
 
@@ -999,10 +1001,22 @@ function renderMDurs(busySet = new Set()) {
   });
 }
 
+function tryGoToStep3() {
+  const errBox = document.getElementById('mStep2Err');
+  if (!mState.date || !mState.time || !mState.duration) {
+    if (errBox) errBox.style.display = 'block';
+    return;
+  }
+  if (errBox) errBox.style.display = 'none';
+  mGoTo(3);
+}
+
 function checkMBtn2() {
-  const ok = mState.date && mState.time && mState.duration;
+  const ok = !!(mState.date && mState.time && mState.duration);
   const btn = document.getElementById('mBtn2');
-  btn.disabled = !ok; btn.style.opacity = ok ? '1' : '0.3';
+  btn.disabled = !ok;
+  btn.style.opacity = ok ? '1' : '0.3';
+  btn.style.cursor = ok ? 'pointer' : 'not-allowed';
 }
 
 function validateEmail(email) {
@@ -1088,6 +1102,17 @@ const sessionToSala = {
 let mSubmitting = false;
 
 async function confirmBooking() {
+  // Validação de data, horário e duração
+  if (!mState.date || !mState.time || !mState.duration) {
+    const errBox = document.getElementById('mErrorBox');
+    if (errBox) {
+      errBox.textContent = 'Por favor, volte e selecione data, horário e duração.';
+      errBox.style.display = 'block';
+    }
+    mSubmitting = false;
+    return;
+  }
+
   // Validação forçada antes de qualquer coisa
   const name  = document.getElementById('mName').value.trim();
   const phone = document.getElementById('mPhone').value.trim();
