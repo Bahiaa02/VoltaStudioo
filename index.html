@@ -863,7 +863,20 @@ function mGoTo(step) {
   });
   document.getElementById('mSuccess').style.display = 'none';
   updateMSteps(step);
-  if (step===3) renderMSummary();
+  if (step===3) {
+    renderMSummary();
+    // Garante que o botão começa bloqueado
+    const btn = document.getElementById('mBtn3');
+    btn.disabled = true;
+    btn.style.opacity = '0.3';
+    btn.style.cursor = 'not-allowed';
+    btn.style.pointerEvents = 'none';
+    // Limpa erros anteriores
+    ['mNameErr','mPhoneErr','mEmailErr'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.style.display = 'none';
+    });
+  }
 }
 
 function updateMSteps(current) {
@@ -1069,7 +1082,10 @@ function checkMForm() {
   }
 
   const btn = document.getElementById('mBtn3');
-  btn.disabled = !valid; btn.style.opacity = valid ? '1' : '0.3';
+  btn.disabled = !valid;
+  btn.style.opacity = valid ? '1' : '0.3';
+  btn.style.cursor = valid ? 'pointer' : 'not-allowed';
+  btn.style.pointerEvents = valid ? 'auto' : 'none';
 }
 
 function addHoursM(time, h) {
@@ -1089,7 +1105,7 @@ function renderMSummary() {
 // ── Supabase config ─────────────────────────────────────────────
 // Substitua pelos seus valores reais do projeto Supabase
 const SUPABASE_URL = 'https://btfkwfojyldkoshthqga.supabase.co';
-const SUPABASE_KEY = 'sb_publishable_rdM8td_F7lplDqoAN5mNig_NIc8rivq';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ0Zmt3Zm9qeWxka29zaHRocWdhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQyMzA5MDUsImV4cCI6MjA4OTgwNjkwNX0.03PATS-Wvf7hMVEQdv80niUoQJ65LALyxOweJn49_wc';
 
 // Mapeamento de sessão → sala (VoltaStudio/Reserva/Salas/SalaXX)
 const sessionToSala = {
